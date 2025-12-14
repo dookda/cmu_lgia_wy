@@ -1,21 +1,21 @@
-version: '3.3'
 services:
-  nodejs:
-    image: node:20-alpine
-    container_name: lgia_nodejs
-    working_dir: /usr/src/app
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lgia_backend
     depends_on:
       - postgis
     volumes:
-      - ./nodejs:/usr/src/app
+      - ./backend:/app
     ports:
-      - "3000:3000"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:3000" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    command: sh -c "npm i && npm i -g nodemon && nodemon"
+      - "8000:8000"
+    environment:
+      - PG_HOST=postgis
+      - PG_USER=postgres
+      - PG_PASSWORD=1234
+      - PG_NAME=postgres
+      - PG_PORT=5432
 
   postgis:
     image: postgis/postgis
@@ -24,7 +24,6 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=1234
-    # - POSTGRES_DB=geodb
     ports:
       - 5433:5432
     volumes:
@@ -37,7 +36,7 @@ services:
     container_name: lgia_frontend
     working_dir: /app
     depends_on:
-      - nodejs
+      - backend
     volumes:
       - ./frontend:/app
       - /app/node_modules
