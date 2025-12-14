@@ -1,0 +1,31 @@
+version: '3.3'
+services:
+  nodejs:
+    image: node:20-alpine
+    container_name: lgia_nodejs
+    working_dir: /usr/src/app
+    depends_on:
+      - postgis
+    volumes:
+      - ./nodejs:/usr/src/app
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3000" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: sh -c "npm i && npm i -g nodemon && nodemon"
+
+  postgis:
+    image: postgis/postgis
+    container_name: lgia_postgis
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=1234
+    # - POSTGRES_DB=geodb
+    ports:
+      - 5433:5432
+    volumes:
+      - ./postgis:/docker-entrypoint-initdb.d
