@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
 
 const AuthContext = createContext();
 
@@ -35,11 +34,24 @@ export const AuthProvider = ({ children }) => {
                 // Here we assume the backend is on the same domain or proxied.
                 // If porting to separate frontend dev server, we need to point to backend.
                 // For now, assuming proxy setup in vite.config.js
-                const response = await axios.post('/api/verify_token', {}, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const response = await fetch('/api/verify_token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
                 });
 
-                if (response.data.status === 'success') {
+                if (!response.ok) {
+                    console.warn(`Auth verification failed: ${response.status}`);
+                    setUser(null);
+                    setLoading(false);
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
                     setUser({ username, role, token });
                 } else {
                     setUser(null);

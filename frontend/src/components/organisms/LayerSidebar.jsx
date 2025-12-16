@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { IoChevronDown, IoChevronForward } from "react-icons/io5";
 
 const DIVISIONS = [
@@ -30,10 +29,22 @@ const LayerSidebar = ({ onLayerToggle, checkedLayers }) => {
     useEffect(() => {
         const fetchLayers = async () => {
             try {
-                const response = await axios.post("/api/list_layer");
-                setLayers(response.data || []);
+                const response = await fetch("/api/list_layer", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                });
+
+                if (!response.ok) {
+                    console.error(`Failed to fetch layers: ${response.status} ${response.statusText}`);
+                    setLayers([]);
+                    return;
+                }
+
+                const data = await response.json();
+                setLayers(data || []);
             } catch (error) {
                 console.error("Failed to fetch layers:", error);
+                setLayers([]);
             }
         };
         fetchLayers();
