@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Navbar from "../components/organisms/Navbar";
 import LayerSidebar from "../components/organisms/LayerSidebar";
 import LeafletMap from "../components/organisms/LeafletMap";
@@ -30,6 +30,7 @@ const Home = () => {
     const [showModal, setShowModal] = useState(false);
     const [selectedFeature, setSelectedFeature] = useState(null);
     const [featureAttributes, setFeatureAttributes] = useState([]);
+    const mapRef = useRef(null);
 
     const menuItems = [
         { path: "/report", icon: IoDocumentText, label: "รายงาน", roles: ["admin", "editor", "user"] },
@@ -201,8 +202,34 @@ const Home = () => {
     };
 
     const handleZoomToFeature = (id) => {
-        // This would be implemented to zoom the map to the selected feature
-        console.log("Zoom to feature:", id);
+        // Find the feature in filteredData
+        const feature = filteredData.find(item => item.id === id);
+        if (!feature || !feature.geojson) {
+            console.log("Feature not found or no geometry:", id);
+            return;
+        }
+
+        try {
+            const geometry = JSON.parse(feature.geojson);
+            if (mapRef.current) {
+                let latlng;
+                if (geometry.type === "Point") {
+                    latlng = [geometry.coordinates[1], geometry.coordinates[0]];
+                    mapRef.current.setView(latlng, 18);
+                } else if (geometry.type === "LineString" || geometry.type === "Polygon" || geometry.type === "MultiPolygon") {
+                    // For lines and polygons, calculate center
+                    const coords = geometry.type === "Polygon" ? geometry.coordinates[0] :
+                        geometry.type === "MultiPolygon" ? geometry.coordinates[0][0] :
+                            geometry.coordinates;
+                    const latSum = coords.reduce((sum, c) => sum + c[1], 0);
+                    const lngSum = coords.reduce((sum, c) => sum + c[0], 0);
+                    latlng = [latSum / coords.length, lngSum / coords.length];
+                    mapRef.current.setView(latlng, 17);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to parse geometry:", e);
+        }
     };
 
     useEffect(() => {
@@ -253,6 +280,7 @@ const Home = () => {
                                 checkedLayers={checkedLayers}
                                 onFeatureClick={handleFeatureClick}
                                 enableWeatherLayers={true}
+                                mapRef={mapRef}
                             />
                         </div>
 
@@ -384,15 +412,21 @@ const Home = () => {
 
             {/* Feature Attribute Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+                <div className="fixed inset-0 z-[1050] flex items-center justify-center">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/50"
+                        onClick={() => setShowModal(false)}
+                    />
+                    {/* Modal Content */}
+                    <div className="relative bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden shadow-2xl">
                         <div className="flex justify-between items-center p-4 border-b border-gray-200">
                             <h3 className="text-lg font-semibold text-gray-800">
                                 รายละเอียดข้อมูล
                             </h3>
                             <button
                                 onClick={() => setShowModal(false)}
-                                className="text-gray-500 hover:text-gray-700"
+                                className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition"
                             >
                                 <IoClose className="text-2xl" />
                             </button>

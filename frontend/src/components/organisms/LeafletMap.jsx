@@ -12,7 +12,7 @@ L.Icon.Default.mergeOptions({
     shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-const LeafletMap = ({ checkedLayers, onFeatureClick, enableWeatherLayers = true }) => {
+const LeafletMap = ({ checkedLayers, onFeatureClick, enableWeatherLayers = true, mapRef: externalMapRef }) => {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const layersRef = useRef({});
@@ -58,6 +58,11 @@ const LeafletMap = ({ checkedLayers, onFeatureClick, enableWeatherLayers = true 
             }
 
             L.control.layers(baseMaps, overlayMaps).addTo(mapInstance.current);
+
+            // Expose map instance to parent via ref
+            if (externalMapRef) {
+                externalMapRef.current = mapInstance.current;
+            }
         }
 
         return () => {

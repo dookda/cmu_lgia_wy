@@ -19,7 +19,7 @@ const Report = () => {
       .then((res) => {
         const layerOptions = (res.data || []).map(layer => ({
           value: layer.formid,
-          label: `${layer.formname} (${layer.division || 'ทั่วไป'})`
+          label: `${layer.layername} (${layer.division || 'ทั่วไป'})`
         }));
         setLayers(layerOptions);
       })

@@ -4,8 +4,10 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: lgia_backend
+    restart: unless-stopped
     depends_on:
-      - postgis
+      postgis:
+        condition: service_healthy
     volumes:
       - ./backend:/app
     ports:
@@ -14,8 +16,14 @@ services:
       - PG_HOST=postgis
       - PG_USER=postgres
       - PG_PASSWORD=1234
-      - PG_NAME=postgres
+      - PG_NAME=lgia
       - PG_PORT=5432
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   postgis:
     image: postgis/postgis
@@ -28,6 +36,13 @@ services:
       - 5433:5432
     volumes:
       - ./postgis:/docker-entrypoint-initdb.d
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d lgia" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
 
   frontend:
     build:
@@ -36,10 +51,14 @@ services:
     container_name: lgia_frontend
     working_dir: /app
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:
       - "5173:5173"
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+
+volumes:
+  pgdata:
