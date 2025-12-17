@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { IoChevronDown, IoChevronForward } from "react-icons/io5";
 
 const DIVISIONS = [
@@ -21,7 +21,31 @@ const getDivisionId = (divisionName) => {
     return division ? division.id : null;
 };
 
-const LayerSidebar = ({ onLayerToggle, checkedLayers }) => {
+// Memoized layer item to prevent unnecessary re-renders
+const LayerItem = memo(({ layer, isChecked, onToggle }) => {
+    const handleChange = useCallback((e) => {
+        e.stopPropagation();
+        onToggle(layer.formid, layer.layertype);
+    }, [layer.formid, layer.layertype, onToggle]);
+
+    return (
+        <div className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 py-0.5">
+            <input
+                type="checkbox"
+                checked={isChecked}
+                onChange={handleChange}
+                className="rounded border-gray-300 text-orange-500 focus:ring-orange-500 cursor-pointer"
+            />
+            <span className="truncate cursor-pointer" onClick={handleChange}>
+                {layer.layername}
+            </span>
+        </div>
+    );
+});
+
+LayerItem.displayName = "LayerItem";
+
+const LayerSidebar = ({ onLayerToggle, checkedLayers = [] }) => {
     const [layers, setLayers] = useState([]);
     const [expandedDivisions, setExpandedDivisions] = useState({});
     const [mainExpanded, setMainExpanded] = useState(true);
@@ -35,7 +59,7 @@ const LayerSidebar = ({ onLayerToggle, checkedLayers }) => {
                 });
 
                 if (!response.ok) {
-                    console.error(`Failed to fetch layers: ${response.status} ${response.statusText}`);
+                    console.error(`Failed to fetch layers: ${response.status}`);
                     setLayers([]);
                     return;
                 }
@@ -50,17 +74,20 @@ const LayerSidebar = ({ onLayerToggle, checkedLayers }) => {
         fetchLayers();
     }, []);
 
-    const toggleDivision = (divisionId) => {
+    const toggleDivision = useCallback((divisionId) => {
         setExpandedDivisions((prev) => ({
             ...prev,
             [divisionId]: !prev[divisionId],
         }));
-    };
+    }, []);
 
     const layersByDivision = DIVISIONS.map((div) => ({
         ...div,
         layers: layers.filter((layer) => getDivisionId(layer.division) === div.id),
     })).filter((div) => div.layers.length > 0);
+
+    // Convert checkedLayers to a Set for O(1) lookup
+    const checkedSet = new Set(checkedLayers.map(String));
 
     return (
         <div className="p-3">
@@ -91,20 +118,12 @@ const LayerSidebar = ({ onLayerToggle, checkedLayers }) => {
                             {expandedDivisions[division.id] && (
                                 <div className="pl-4 space-y-1">
                                     {division.layers.map((layer) => (
-                                        <label
+                                        <LayerItem
                                             key={layer.formid}
-                                            className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 cursor-pointer py-0.5"
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={checkedLayers.includes(layer.formid)}
-                                                onChange={() =>
-                                                    onLayerToggle(layer.formid, layer.layertype)
-                                                }
-                                                className="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
-                                            />
-                                            <span className="truncate">{layer.layername}</span>
-                                        </label>
+                                            layer={layer}
+                                            isChecked={checkedSet.has(String(layer.formid))}
+                                            onToggle={onLayerToggle}
+                                        />
                                     ))}
                                 </div>
                             )}

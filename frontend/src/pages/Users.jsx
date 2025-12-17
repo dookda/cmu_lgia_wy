@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/organisms/Navbar';
 import { Card, Text, Button, Input, Select } from '../components/atoms';
 import { Alert, Spinner } from '../components/molecules';
-import { IoPeople, IoAdd, IoPencil, IoTrash, IoSearch, IoShield } from 'react-icons/io5';
+import { IoPeople, IoAdd, IoPencil, IoTrash, IoSearch, IoShield, IoHome } from 'react-icons/io5';
 import { useAuth } from '../context/AuthContext';
 
 const Users = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,8 +39,9 @@ const Users = () => {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const response = await axios.post('/api/listuser');
-      setUsers(response.data || []);
+      const response = await fetch('/api/listuser', { method: 'POST' });
+      const data = await response.json();
+      setUsers(data || []);
       setError('');
     } catch (err) {
       setError('ไม่สามารถโหลดรายการผู้ใช้ได้');
@@ -55,12 +57,16 @@ const Users = () => {
 
   const handleSave = async () => {
     try {
-      await axios.post('/api/edituser', {
-        id: editingUser.id,
-        username: editingUser.username,
-        email: editingUser.email,
-        division: editingUser.division,
-        auth: editingUser.auth,
+      await fetch('/api/edituser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingUser.id,
+          username: editingUser.username,
+          email: editingUser.email,
+          division: editingUser.division,
+          auth: editingUser.auth,
+        }),
       });
 
       setSuccess('บันทึกข้อมูลผู้ใช้สำเร็จ');
@@ -77,7 +83,11 @@ const Users = () => {
     }
 
     try {
-      await axios.post('/api/deleteuser', { id: userId });
+      await fetch('/api/deleteuser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId }),
+      });
       setSuccess(`ลบผู้ใช้ "${username}" สำเร็จ`);
       loadUsers();
     } catch (err) {
@@ -130,7 +140,13 @@ const Users = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-4 mb-2">
+            <button
+              onClick={() => navigate("/")}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+            >
+              <IoHome /> หน้าหลัก
+            </button>
             <IoPeople className="text-3xl text-orange-600" />
             <Text variant="h2" color="primary">จัดการผู้ใช้</Text>
           </div>

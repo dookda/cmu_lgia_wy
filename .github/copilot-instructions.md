@@ -7,3 +7,4 @@ Before creating or editing, please follow these guidelines:
 6.Follow best practices of Atomic Design methodology
 7.Develop the map by following the reference at https://maplibre.org/maplibre-gl-js/docs/API/
 8.Develop the UI by following the reference at https://tailwindcss.com/docs/installation/using-vite
+9.Develop the web application by following the reference at https://react.dev/reference/react

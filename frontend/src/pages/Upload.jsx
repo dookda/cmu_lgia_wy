@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/organisms/Navbar";
-import { IoCloudUpload, IoArrowBack, IoCheckmarkCircle, IoWarning, IoDocument } from "react-icons/io5";
+import { IoCloudUpload, IoHome, IoCheckmarkCircle, IoWarning, IoDocument } from "react-icons/io5";
 
 const Upload = () => {
     const navigate = useNavigate();
@@ -91,10 +91,10 @@ const Upload = () => {
                 <div className="max-w-6xl mx-auto">
                     <div className="mb-6 flex items-center gap-4">
                         <button
-                            onClick={() => navigate(-1)}
+                            onClick={() => navigate("/")}
                             className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
                         >
-                            <IoArrowBack /> กลับ
+                            <IoHome /> หน้าหลัก
                         </button>
                         <h2 className="text-3xl font-bold text-gray-800">นำเข้าข้อมูลจาก CSV</h2>
                     </div>

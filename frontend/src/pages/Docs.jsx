@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/organisms/Navbar';
 import { Card, Text } from '../components/atoms';
 import { CollapsibleSection } from '../components/molecules';
-import { IoBook, IoHelp, IoMap, IoCloudUpload, IoLayers, IoPeople } from 'react-icons/io5';
+import { IoBook, IoHelp, IoMap, IoCloudUpload, IoLayers, IoPeople, IoHome } from 'react-icons/io5';
 
 const Docs = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -12,7 +15,13 @@ const Docs = () => {
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-4 mb-2">
+            <button
+              onClick={() => navigate("/")}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+            >
+              <IoHome /> หน้าหลัก
+            </button>
             <IoBook className="text-3xl text-orange-600" />
             <Text variant="h2" color="primary">คู่มือการใช้งาน</Text>
           </div>

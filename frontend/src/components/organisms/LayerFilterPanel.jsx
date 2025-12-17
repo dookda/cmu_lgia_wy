@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 
 const LayerFilterPanel = ({ layers, onLayerSelect, onSearch }) => {
     const [selectedLayer, setSelectedLayer] = useState("");
@@ -10,10 +9,14 @@ const LayerFilterPanel = ({ layers, onLayerSelect, onSearch }) => {
 
     useEffect(() => {
         if (selectedLayer) {
-            axios
-                .post("/api/load_column_description", { formid: selectedLayer })
-                .then((res) => {
-                    setColumns(res.data || []);
+            fetch("/api/load_column_description", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ formid: selectedLayer }),
+            })
+                .then((res) => res.json())
+                .then((data) => {
+                    setColumns(data || []);
                     setSelectedColumn("");
                     setKeywords([]);
                     setSelectedKeyword("");
@@ -24,13 +27,17 @@ const LayerFilterPanel = ({ layers, onLayerSelect, onSearch }) => {
 
     useEffect(() => {
         if (selectedLayer && selectedColumn) {
-            axios
-                .post("/api/load_by_column_id", {
+            fetch("/api/load_by_column_id", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
                     formid: selectedLayer,
                     columnid: selectedColumn,
-                })
-                .then((res) => {
-                    const uniqueKeywords = res.data?.map((row) => row[selectedColumn]) || [];
+                }),
+            })
+                .then((res) => res.json())
+                .then((data) => {
+                    const uniqueKeywords = data?.map((row) => row[selectedColumn]) || [];
                     setKeywords([...new Set(uniqueKeywords)]);
                     setSelectedKeyword("");
                 })

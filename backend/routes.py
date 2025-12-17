@@ -57,6 +57,7 @@ class UpdateLayerRequest(BaseModel):
     id: int
     geojson: Optional[str] = None
     dataarr: str
+    style: Optional[str] = None
 
 
 class DeleteRowRequest(BaseModel):
@@ -290,20 +291,64 @@ async def create_table(req: CreateTableRequest):
 @router.post("/save_layer")
 async def save_layer(req: SaveLayerRequest):
     import json
+    from datetime import datetime
     data_arr = json.loads(req.dataarr)
     refid = f"ref{int(time.time() * 1000)}"
     pool = await get_pool()
     async with pool.acquire() as conn:
+        # Insert the new geometry
         await conn.execute(
             f"INSERT INTO {req.formid} (refid, geom, ts) VALUES ($1, ST_GeomFromGeoJSON($2), now())",
             refid, req.geojson
         )
+        
+        # Fetch column types to handle date and numeric fields properly
+        column_types = {}
+        col_rows = await conn.fetch(
+            "SELECT col_id, col_type FROM layer_column WHERE formid = $1",
+            req.formid
+        )
+        for row in col_rows:
+            column_types[row["col_id"]] = row["col_type"]
+        
+        # Update attribute data with proper type conversion
         for e in data_arr:
-            if e.get("value"):
-                val = e["value"] if e["value"] else "0"
+            val = e.get("value", "")
+            col_name = e["name"]
+            col_type = column_types.get(col_name, "text")
+            
+            # Skip empty values (but allow "0" for numeric fields)
+            if not val and val != "0":
+                continue
+            
+            # Handle different column types for asyncpg
+            if col_type == "date":
+                if val:  # Only update if there's a value
+                    try:
+                        # Convert date string to Python date object for asyncpg
+                        date_val = datetime.strptime(val, "%Y-%m-%d").date()
+                        await conn.execute(
+                            f"UPDATE {req.formid} SET {col_name} = $1 WHERE refid = $2",
+                            date_val, refid
+                        )
+                    except (ValueError, TypeError):
+                        # If date parsing fails, skip this field
+                        pass
+            # For numeric columns, convert to float
+            elif col_type == "numeric":
+                try:
+                    float_val = float(val) if val else 0
+                    await conn.execute(
+                        f"UPDATE {req.formid} SET {col_name} = $1 WHERE refid = $2",
+                        float_val, refid
+                    )
+                except (ValueError, TypeError):
+                    pass
+            # For text and other types, update as string
+            else:
                 await conn.execute(
-                    f"UPDATE {req.formid} SET {e['name']} = $1 WHERE refid = $2",
-                    val, refid
+                    f"UPDATE {req.formid} SET {col_name} = $1 WHERE refid = $2",
+                    str(val), refid
                 )
     return {"status": "saved"}
 
@@ -311,16 +356,72 @@ async def save_layer(req: SaveLayerRequest):
 @router.post("/update_layer")
 async def update_layer(req: UpdateLayerRequest):
     import json
+    from datetime import datetime
     data_arr = json.loads(req.dataarr)
     pool = await get_pool()
     async with pool.acquire() as conn:
+        # Update geometry if provided
+        if req.geojson:
+            await conn.execute(
+                f"UPDATE {req.formid} SET geom = ST_GeomFromGeoJSON($1) WHERE id = $2",
+                req.geojson, req.id
+            )
+        
+        # Update attribute data
+        # We need to get column types to handle date and numeric fields properly
+        column_types = {}
+        col_rows = await conn.fetch(
+            "SELECT col_id, col_type FROM layer_column WHERE formid = $1",
+            req.formid
+        )
+        for row in col_rows:
+            column_types[row["col_id"]] = row["col_type"]
+        
         for e in data_arr:
-            if e.get("value"):
-                val = e["value"] if e["value"] else "0"
+            val = e.get("value", "")
+            col_name = e["name"]
+            col_type = column_types.get(col_name, "text")
+            
+            # Skip empty values (but allow "0" for numeric fields)
+            if not val and val != "0":
+                continue
+            
+            # Handle different column types for asyncpg
+            if col_type == "date":
+                if val:  # Only update if there's a value
+                    try:
+                        # Convert date string to Python date object for asyncpg
+                        date_val = datetime.strptime(val, "%Y-%m-%d").date()
+                        await conn.execute(
+                            f"UPDATE {req.formid} SET {col_name} = $1 WHERE id = $2",
+                            date_val, req.id
+                        )
+                    except (ValueError, TypeError):
+                        # If date parsing fails, skip this field
+                        pass
+            # For numeric columns, convert to float
+            elif col_type == "numeric":
+                try:
+                    float_val = float(val) if val else 0
+                    await conn.execute(
+                        f"UPDATE {req.formid} SET {col_name} = $1 WHERE id = $2",
+                        float_val, req.id
+                    )
+                except (ValueError, TypeError):
+                    pass
+            # For text and other types, update as string
+            else:
                 await conn.execute(
-                    f"UPDATE {req.formid} SET {e['name']} = $1 WHERE id = $2",
-                    val, req.id
+                    f"UPDATE {req.formid} SET {col_name} = $1 WHERE id = $2",
+                    str(val), req.id
                 )
+        
+        # Update style if provided
+        if req.style:
+            await conn.execute(
+                f"UPDATE {req.formid} SET style = $1 WHERE id = $2",
+                req.style, req.id
+            )
     return {"status": "updated"}
 
 

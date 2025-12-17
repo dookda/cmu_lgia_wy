@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/organisms/Navbar';
 import { Card, Text, Button, Select } from '../components/atoms';
 import { Spinner, Alert } from '../components/molecules';
-import { IoDocumentText, IoDownload, IoPrint, IoBarChart } from 'react-icons/io5';
+import { IoDocumentText, IoDownload, IoPrint, IoBarChart, IoHome } from 'react-icons/io5';
 
 const Report = () => {
+  const navigate = useNavigate();
   const [layers, setLayers] = useState([]);
   const [selectedLayer, setSelectedLayer] = useState('');
   const [reportData, setReportData] = useState(null);
@@ -14,10 +15,10 @@ const Report = () => {
 
   useEffect(() => {
     // Load available layers
-    axios
-      .post('/api/list_layer')
-      .then((res) => {
-        const layerOptions = (res.data || []).map(layer => ({
+    fetch('/api/list_layer', { method: 'POST' })
+      .then((res) => res.json())
+      .then((data) => {
+        const layerOptions = (data || []).map(layer => ({
           value: layer.formid,
           label: `${layer.layername} (${layer.division || 'ทั่วไป'})`
         }));
@@ -70,7 +71,13 @@ const Report = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-4 mb-2">
+            <button
+              onClick={() => navigate("/")}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+            >
+              <IoHome /> หน้าหลัก
+            </button>
             <IoDocumentText className="text-3xl text-orange-600" />
             <Text variant="h2" color="primary">รายงาน</Text>
           </div>

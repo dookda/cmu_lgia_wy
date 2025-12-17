@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -15,18 +14,23 @@ const Login = () => {
         setError('');
 
         try {
-            const response = await axios.post('/api/login', { username, password });
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
+            const data = await response.json();
 
-            if (response.data.status === 'success') {
+            if (data.status === 'success') {
                 // Set cookies like the old version
-                document.cookie = `lgiatoken=${response.data.token}; path=/`;
-                document.cookie = `lgiausername=${response.data.username}; path=/`;
-                document.cookie = `lgiaauth=${response.data.role}; path=/`;
+                document.cookie = `lgiatoken=${data.token}; path=/`;
+                document.cookie = `lgiausername=${data.username}; path=/`;
+                document.cookie = `lgiaauth=${data.role}; path=/`;
 
                 // Redirect to home
                 window.location.href = '/';
             } else {
-                setError(response.data.message || 'เข้าสู่ระบบไม่สำเร็จ');
+                setError(data.message || 'เข้าสู่ระบบไม่สำเร็จ');
             }
         } catch (err) {
             setError('เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
@@ -88,8 +92,17 @@ const Login = () => {
                     </button>
                 </form>
 
-                <div className="mt-6 text-center">
-                    <a href="/" className="text-orange-600 hover:text-orange-700 text-sm">
+                <div className="mt-6 text-center space-y-3">
+                    <p className="text-gray-600 text-sm">
+                        ยังไม่มีบัญชี?{" "}
+                        <Link
+                            to="/register"
+                            className="text-orange-600 hover:text-orange-700 font-medium"
+                        >
+                            ลงทะเบียนที่นี่
+                        </Link>
+                    </p>
+                    <a href="/" className="block text-gray-500 hover:text-gray-700 text-sm">
                         กลับหน้าหลัก
                     </a>
                 </div>

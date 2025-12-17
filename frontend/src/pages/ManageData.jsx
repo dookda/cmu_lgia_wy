@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/organisms/Navbar";
-import { IoLayers, IoTrash, IoAdd, IoArrowBack } from "react-icons/io5";
+import { IoLayers, IoTrash, IoAdd, IoHome } from "react-icons/io5";
 
 const ManageData = () => {
     const navigate = useNavigate();
@@ -79,10 +79,10 @@ const ManageData = () => {
                 <div className="max-w-7xl mx-auto">
                     <div className="mb-6 flex items-center gap-4">
                         <button
-                            onClick={() => navigate(-1)}
+                            onClick={() => navigate("/")}
                             className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
                         >
-                            <IoArrowBack /> กลับ
+                            <IoHome /> หน้าหลัก
                         </button>
                         <h2 className="text-3xl font-bold text-gray-800">จัดการชั้นข้อมูล</h2>
                     </div>

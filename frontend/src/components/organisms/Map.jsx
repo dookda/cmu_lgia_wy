@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import axios from "axios";
 
 const Map = ({ checkedLayers = [] }) => {
     const mapContainer = useRef(null);
@@ -83,10 +82,12 @@ const Map = ({ checkedLayers = [] }) => {
                 if (layerSourcesRef.current.has(sourceId)) continue;
 
                 try {
-                    const response = await axios.post("/api/load_layer", {
-                        formid: layer.formid,
+                    const response = await fetch("/api/load_layer", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ formid: layer.formid }),
                     });
-                    const data = response.data;
+                    const data = await response.json();
 
                     if (data && data.length > 0) {
                         const features = data
@@ -94,9 +95,27 @@ const Map = ({ checkedLayers = [] }) => {
                             .map((item) => {
                                 try {
                                     const geometry = JSON.parse(item.geojson);
+                                    // Parse style if available
+                                    let styleObj = {};
+                                    if (item.style) {
+                                        try {
+                                            styleObj = JSON.parse(item.style);
+                                        } catch {
+                                            styleObj = {};
+                                        }
+                                    }
                                     return {
                                         type: "Feature",
-                                        properties: { id: item.id },
+                                        properties: {
+                                            id: item.id,
+                                            // Include style properties for MapLibre data-driven styling
+                                            color: styleObj.color || '#3388ff',
+                                            fillColor: styleObj.fillColor || '#3388ff',
+                                            weight: styleObj.weight || 3,
+                                            opacity: styleObj.opacity || 1,
+                                            fillOpacity: styleObj.fillOpacity || 0.5,
+                                            radius: styleObj.radius || 6,
+                                        },
                                         geometry: geometry,
                                     };
                                 } catch {
@@ -121,10 +140,12 @@ const Map = ({ checkedLayers = [] }) => {
                                 type: "circle",
                                 source: sourceId,
                                 paint: {
-                                    "circle-radius": 6,
-                                    "circle-color": "#ff6b35",
-                                    "circle-stroke-width": 2,
-                                    "circle-stroke-color": "#ffffff",
+                                    // Use data-driven styling for per-feature colors
+                                    "circle-radius": ["coalesce", ["get", "radius"], 6],
+                                    "circle-color": ["coalesce", ["get", "fillColor"], "#ff6b35"],
+                                    "circle-stroke-width": ["coalesce", ["get", "weight"], 2],
+                                    "circle-stroke-color": ["coalesce", ["get", "color"], "#ffffff"],
+                                    "circle-opacity": ["coalesce", ["get", "fillOpacity"], 0.8],
                                 },
                             });
                         } else if (layer.layertype === "linestring") {
@@ -133,8 +154,9 @@ const Map = ({ checkedLayers = [] }) => {
                                 type: "line",
                                 source: sourceId,
                                 paint: {
-                                    "line-color": "#3388ff",
-                                    "line-width": 3,
+                                    "line-color": ["coalesce", ["get", "color"], "#3388ff"],
+                                    "line-width": ["coalesce", ["get", "weight"], 3],
+                                    "line-opacity": ["coalesce", ["get", "opacity"], 1],
                                 },
                             });
                         } else {
@@ -143,8 +165,8 @@ const Map = ({ checkedLayers = [] }) => {
                                 type: "fill",
                                 source: sourceId,
                                 paint: {
-                                    "fill-color": "#3388ff",
-                                    "fill-opacity": 0.5,
+                                    "fill-color": ["coalesce", ["get", "fillColor"], "#3388ff"],
+                                    "fill-opacity": ["coalesce", ["get", "fillOpacity"], 0.5],
                                 },
                             });
                             map.current.addLayer({
@@ -152,8 +174,8 @@ const Map = ({ checkedLayers = [] }) => {
                                 type: "line",
                                 source: sourceId,
                                 paint: {
-                                    "line-color": "#3388ff",
-                                    "line-width": 2,
+                                    "line-color": ["coalesce", ["get", "color"], "#3388ff"],
+                                    "line-width": ["coalesce", ["get", "weight"], 2],
                                 },
                             });
                         }

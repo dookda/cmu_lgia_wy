@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Navbar from "../components/organisms/Navbar";
 import LayerSidebar from "../components/organisms/LayerSidebar";
 import LeafletMap from "../components/organisms/LeafletMap";
@@ -42,9 +42,15 @@ const Home = () => {
         { path: "/docs", icon: IoBook, label: "คู่มือการใช้งาน", roles: ["admin", "editor", "user"] },
     ];
 
-    const filteredMenu = menuItems.filter(
-        (item) => !user || item.roles.includes(user.role) || item.roles.includes("user")
-    );
+    // Filter menu items based on user role
+    const filteredMenu = menuItems.filter((item) => {
+        if (!user) {
+            // Not logged in - show only items accessible to everyone (with "user" role)
+            return item.roles.includes("user");
+        }
+        // Logged in - show items that match the user's role
+        return item.roles.includes(user.role);
+    });
 
     useEffect(() => {
         loadLayers();
@@ -73,16 +79,48 @@ const Home = () => {
         }
     };
 
-    const handleLayerToggle = (formid, layertype) => {
-        setCheckedLayers((prev) => {
-            const exists = prev.find((l) => l.formid === formid);
-            if (exists) {
-                return prev.filter((l) => l.formid !== formid);
+    const handleLayerToggle = useCallback((formid, layertype) => {
+        const id = String(formid);
+
+        setCheckedLayers(prevLayers => {
+            const existingIndex = prevLayers.findIndex((l) => String(l.formid) === id);
+
+            if (existingIndex >= 0) {
+                // Layer exists - remove it
+                console.log("Unchecking layer:", id);
+                const newLayers = prevLayers.filter((l) => String(l.formid) !== id);
+
+                // Handle filter state update
+                if (String(selectedLayer) === id) {
+                    if (newLayers.length > 0) {
+                        // Don't auto-select another layer when unchecking
+                        setSelectedLayer(null);
+                        setLayerColumns([]);
+                        setLayerData([]);
+                        setFilteredData([]);
+                        setSelectedColumn("");
+                        setKeywords([]);
+                        setSelectedKeyword("");
+                    } else {
+                        setSelectedLayer(null);
+                        setLayerColumns([]);
+                        setLayerData([]);
+                        setFilteredData([]);
+                        setSelectedColumn("");
+                        setKeywords([]);
+                        setSelectedKeyword("");
+                    }
+                }
+
+                return newLayers;
             } else {
-                return [...prev, { formid, layertype }];
+                // Layer doesn't exist - add it
+                console.log("Checking layer:", id);
+                // Don't auto-select when checking, let user select from dropdown
+                return [...prevLayers, { formid: id, layertype }];
             }
         });
-    };
+    }, [selectedLayer]);
 
     const handleLayerSelect = async (formid) => {
         if (!formid || formid === "เลือก...") {
@@ -266,7 +304,7 @@ const Home = () => {
                     <div className="flex-1 overflow-y-auto">
                         <LayerSidebar
                             onLayerToggle={handleLayerToggle}
-                            checkedLayers={checkedLayers.map((l) => l.formid)}
+                            checkedLayers={checkedLayers.map((l) => String(l.formid))}
                         />
                     </div>
                 </aside>
@@ -274,7 +312,7 @@ const Home = () => {
                 {/* Main Content */}
                 <main className="flex-1 flex flex-col overflow-hidden">
                     <div className="flex-1 flex">
-                        {/* Map */}
+                        {/* Map with Floating Filter Panel */}
                         <div className="flex-1 relative">
                             <LeafletMap
                                 checkedLayers={checkedLayers}
@@ -282,33 +320,36 @@ const Home = () => {
                                 enableWeatherLayers={true}
                                 mapRef={mapRef}
                             />
-                        </div>
 
-                        {/* Right Panel - Filter */}
-                        <div className="w-80 p-4 overflow-y-auto bg-gray-50 border-l border-gray-200">
-                            <div className="bg-white rounded-lg p-4 shadow">
+                            {/* Floating Filter Panel */}
+                            <div className="absolute top-4 right-4 w-80 max-h-[calc(100%-2rem)] overflow-y-auto bg-white rounded-lg shadow-2xl z-[1000] p-4">
                                 <h3 className="text-lg font-semibold mb-4 text-gray-800">
                                     ค้นหาข้อมูล
                                 </h3>
 
-                                {/* Layer Selection */}
-                                <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        เลือกชั้นข้อมูล
-                                    </label>
-                                    <select
-                                        value={selectedLayer || ""}
-                                        onChange={(e) => handleLayerSelect(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                                    >
-                                        <option value="">เลือก...</option>
-                                        {allLayers.map((layer) => (
-                                            <option key={layer.formid} value={layer.formid}>
-                                                {layer.layername}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                                {/* Layer Selection - only show if layers are checked */}
+                                {checkedLayers.length > 0 && (
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            เลือกชั้นข้อมูล
+                                        </label>
+                                        <select
+                                            value={selectedLayer || ""}
+                                            onChange={(e) => handleLayerSelect(e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        >
+                                            <option value="">เลือก...</option>
+                                            {checkedLayers.map((layer) => {
+                                                const layerInfo = allLayers.find(l => l.formid === layer.formid);
+                                                return (
+                                                    <option key={layer.formid} value={layer.formid}>
+                                                        {layerInfo?.layername || layer.formid}
+                                                    </option>
+                                                );
+                                            })}
+                                        </select>
+                                    </div>
+                                )}
 
                                 {/* Column Selection */}
                                 {layerColumns.length > 0 && (
@@ -349,6 +390,13 @@ const Home = () => {
                                                 </option>
                                             ))}
                                         </select>
+                                    </div>
+                                )}
+
+                                {/* Empty state message */}
+                                {checkedLayers.length === 0 && (
+                                    <div className="text-center text-gray-400 text-sm py-4">
+                                        <p>กรุณาเลือกชั้นข้อมูลจากรายการด้านซ้าย</p>
                                     </div>
                                 )}
                             </div>

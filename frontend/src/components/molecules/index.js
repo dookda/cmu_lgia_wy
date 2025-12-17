@@ -1,6 +1,10 @@
 export { default as Alert } from './Alert';
+export { default as AlertModal } from './AlertModal';
+export { default as ConfirmModal } from './ConfirmModal';
 export { default as Logo } from './Logo';
 export { default as UserInfo } from './UserInfo';
 export { default as CollapsibleSection } from './CollapsibleSection';
 export { default as FormGroup } from './FormGroup';
 export { default as Spinner } from './Spinner';
+export { default as SymbolEditor } from './SymbolEditor';
+export { default as SymbolEditorModal } from './SymbolEditorModal';
