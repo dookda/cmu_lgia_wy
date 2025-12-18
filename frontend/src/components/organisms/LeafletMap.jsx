@@ -4,6 +4,33 @@ import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 
+// Load ExtraMarkers for styled icon markers
+const loadExtraMarkers = () => {
+    // Add CSS if not already loaded
+    if (!document.getElementById('leaflet-extra-markers-css')) {
+        const css = document.createElement('link');
+        css.id = 'leaflet-extra-markers-css';
+        css.rel = 'stylesheet';
+        css.href = 'https://cdn.jsdelivr.net/npm/leaflet-extra-markers@1.2.2/dist/css/leaflet.extra-markers.min.css';
+        document.head.appendChild(css);
+    }
+    // Add Font Awesome if not already loaded
+    if (!document.getElementById('font-awesome-css')) {
+        const fa = document.createElement('link');
+        fa.id = 'font-awesome-css';
+        fa.rel = 'stylesheet';
+        fa.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css';
+        document.head.appendChild(fa);
+    }
+    // Load ExtraMarkers JS if not already loaded
+    if (!L.ExtraMarkers && !document.getElementById('leaflet-extra-markers-js')) {
+        const script = document.createElement('script');
+        script.id = 'leaflet-extra-markers-js';
+        script.src = 'https://cdn.jsdelivr.net/npm/leaflet-extra-markers@1.2.2/dist/js/leaflet.extra-markers.min.js';
+        document.head.appendChild(script);
+    }
+};
+
 // Fix for default markers
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -26,6 +53,9 @@ const LeafletMap = ({ checkedLayers = [], onFeatureClick, enableWeatherLayers = 
     // Initialize map once
     useEffect(() => {
         if (mapInstance.current || !mapContainerRef.current) return;
+
+        // Load ExtraMarkers library for styled icon markers
+        loadExtraMarkers();
 
         // Use Canvas renderer for better performance with many markers
         canvasRendererRef.current = L.canvas({ padding: 0.5, tolerance: 10 });
@@ -238,16 +268,32 @@ const LeafletMap = ({ checkedLayers = [], onFeatureClick, enableWeatherLayers = 
             const geoJsonLayer = L.geoJSON(features, {
                 pointToLayer: (feature, latlng) => {
                     const s = feature.properties.style;
-                    // Always use CircleMarker with canvas renderer for best performance
-                    // CircleMarker is much faster than icon-based markers
-                    return L.circleMarker(latlng, {
-                        radius: s?.radius || 8,
-                        fillColor: s?.fillColor || "#ff6b35",
-                        color: s?.color || "#fff",
-                        weight: s?.weight || 2,
-                        fillOpacity: s?.fillOpacity || 0.7,
-                        renderer: canvasRendererRef.current // Use shared canvas renderer
-                    });
+                    const markerType = s?.markerType || 'circleMarker';
+
+                    // Support different marker types based on saved style
+                    if (markerType === 'marker') {
+                        // Default Leaflet marker
+                        return L.marker(latlng);
+                    } else if (markerType === 'markerIcon' && L.ExtraMarkers) {
+                        // ExtraMarkers with FontAwesome icon
+                        const icon = L.ExtraMarkers.icon({
+                            icon: s?.icon || 'fa-map-marker',
+                            markerColor: s?.iconColor || 'red',
+                            shape: s?.shape || 'circle',
+                            prefix: 'fa'
+                        });
+                        return L.marker(latlng, { icon });
+                    } else {
+                        // Default: CircleMarker with canvas renderer for performance
+                        return L.circleMarker(latlng, {
+                            radius: s?.radius || 8,
+                            fillColor: s?.fillColor || "#ff6b35",
+                            color: s?.color || "#fff",
+                            weight: s?.weight || 2,
+                            fillOpacity: s?.fillOpacity || 0.7,
+                            renderer: canvasRendererRef.current
+                        });
+                    }
                 },
                 style: (feature) => {
                     const s = feature.properties.style;

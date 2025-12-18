@@ -26,7 +26,7 @@ services:
       start_period: 30s
 
   postgis:
-    image: postgis/postgis
+    image: imresamu/postgis:17-3.5-alpine
     container_name: lgia_postgis
     restart: always
     environment:

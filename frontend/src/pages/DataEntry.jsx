@@ -8,6 +8,30 @@ import Navbar from "../components/organisms/Navbar";
 import { AlertModal, ConfirmModal, SymbolEditorModal } from "../components/molecules";
 import { IoSave, IoTrash, IoHome, IoSearch, IoColorPalette } from "react-icons/io5";
 
+// Load ExtraMarkers for styled icon markers
+const loadExtraMarkers = () => {
+    if (!document.getElementById('leaflet-extra-markers-css')) {
+        const css = document.createElement('link');
+        css.id = 'leaflet-extra-markers-css';
+        css.rel = 'stylesheet';
+        css.href = 'https://cdn.jsdelivr.net/npm/leaflet-extra-markers@1.2.2/dist/css/leaflet.extra-markers.min.css';
+        document.head.appendChild(css);
+    }
+    if (!document.getElementById('font-awesome-css')) {
+        const fa = document.createElement('link');
+        fa.id = 'font-awesome-css';
+        fa.rel = 'stylesheet';
+        fa.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css';
+        document.head.appendChild(fa);
+    }
+    if (!L.ExtraMarkers && !document.getElementById('leaflet-extra-markers-js')) {
+        const script = document.createElement('script');
+        script.id = 'leaflet-extra-markers-js';
+        script.src = 'https://cdn.jsdelivr.net/npm/leaflet-extra-markers@1.2.2/dist/js/leaflet.extra-markers.min.js';
+        document.head.appendChild(script);
+    }
+};
+
 const DataEntry = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -178,66 +202,58 @@ const DataEntry = () => {
             clearTimeout(autoUpdateTimeoutRef.current);
         }
 
-        // Set new timeout for auto-update (debounced by 2 seconds)
+        // Set new timeout for auto-update (debounced by 2 seconds) - no confirmation needed
         autoUpdateTimeoutRef.current = setTimeout(async () => {
-            // Show confirm dialog for auto-update
-            showConfirm(
-                "คุณต้องการบันทึกการแก้ไขข้อมูลนี้หรือไม่?",
-                async () => {
-                    try {
-                        // Validate data before sending
-                        if (!formData.id || !currentFeature || !formid) {
-                            console.error("Auto-update skipped: missing required data");
-                            return;
-                        }
+            try {
+                // Validate data before sending
+                if (!formData.id || !currentFeature || !formid) {
+                    console.error("Auto-update skipped: missing required data");
+                    return;
+                }
 
-                        // Get and validate geometry
-                        let geojson;
-                        try {
-                            geojson = currentFeature.toGeoJSON().geometry;
-                            if (!geojson || !geojson.type) {
-                                console.error("Auto-update skipped: invalid geometry");
-                                return;
-                            }
-                        } catch (geomError) {
-                            console.error("Auto-update skipped: geometry error", geomError);
-                            return;
-                        }
-
-                        const dataArr = columns
-                            .filter(col => col.col_type !== "date")
-                            .map((col) => ({
-                                name: col.col_id,
-                                value: formData[col.col_id] || "",
-                            }));
-
-                        const response = await fetch("/api/update_layer", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                formid,
-                                id: formData.id,
-                                geojson: JSON.stringify(geojson),
-                                dataarr: JSON.stringify(dataArr),
-                            }),
-                        });
-
-                        if (response.ok) {
-                            setSaveMessage("✓ อัปเดตข้อมูลอัตโนมัติสำเร็จ");
-                            setTimeout(() => setSaveMessage(""), 3000);
-                        } else {
-                            setSaveMessage("⚠ เกิดข้อผิดพลาดในการอัปเดตอัตโนมัติ");
-                            setTimeout(() => setSaveMessage(""), 3000);
-                        }
-                    } catch (error) {
-                        console.error("Auto-update failed:", error);
-                        setSaveMessage("⚠ เกิดข้อผิดพลาดในการอัปเดตอัตโนมัติ");
-                        setTimeout(() => setSaveMessage(""), 3000);
+                // Get and validate geometry
+                let geojson;
+                try {
+                    geojson = currentFeature.toGeoJSON().geometry;
+                    if (!geojson || !geojson.type) {
+                        console.error("Auto-update skipped: invalid geometry");
+                        return;
                     }
-                },
-                'info',
-                'บันทึกอัตโนมัติ'
-            );
+                } catch (geomError) {
+                    console.error("Auto-update skipped: geometry error", geomError);
+                    return;
+                }
+
+                const dataArr = columns
+                    .filter(col => col.col_type !== "date")
+                    .map((col) => ({
+                        name: col.col_id,
+                        value: formData[col.col_id] || "",
+                    }));
+
+                const response = await fetch("/api/update_layer", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        formid,
+                        id: formData.id,
+                        geojson: JSON.stringify(geojson),
+                        dataarr: JSON.stringify(dataArr),
+                    }),
+                });
+
+                if (response.ok) {
+                    setSaveMessage("✓ อัปเดตข้อมูลอัตโนมัติสำเร็จ");
+                    setTimeout(() => setSaveMessage(""), 3000);
+                } else {
+                    setSaveMessage("⚠ เกิดข้อผิดพลาดในการอัปเดตอัตโนมัติ");
+                    setTimeout(() => setSaveMessage(""), 3000);
+                }
+            } catch (error) {
+                console.error("Auto-update failed:", error);
+                setSaveMessage("⚠ เกิดข้อผิดพลาดในการอัปเดตอัตโนมัติ");
+                setTimeout(() => setSaveMessage(""), 3000);
+            }
         }, 2000); // Wait 2 seconds after user stops typing
 
         return () => {
@@ -249,6 +265,9 @@ const DataEntry = () => {
 
     const initializeMap = () => {
         if (!mapInstance.current) {
+            // Load ExtraMarkers library for styled icon markers
+            loadExtraMarkers();
+
             mapInstance.current = L.map(mapRef.current).setView([18.5762, 99.0173], 15);
 
             const googleRoad = L.tileLayer("https://{s}.google.com/vt/lyrs=r&x={x}&y={y}&z={z}", {
@@ -348,33 +367,55 @@ const DataEntry = () => {
                 data.forEach((item) => {
                     try {
                         const geometry = JSON.parse(item.geojson);
-                        const layer = L.geoJSON(geometry).getLayers()[0];
+                        let layer;
+                        const styleObj = item.style ? JSON.parse(item.style) : null;
+
+                        // Create layer based on geometry type with proper styling
+                        if (geometry.type === 'Point') {
+                            const latlng = [geometry.coordinates[1], geometry.coordinates[0]];
+                            const markerType = styleObj?.markerType || 'circleMarker';
+
+                            if (markerType === 'marker') {
+                                // Default Leaflet marker
+                                layer = L.marker(latlng);
+                            } else if (markerType === 'markerIcon' && L.ExtraMarkers) {
+                                // ExtraMarkers with FontAwesome icon
+                                const icon = L.ExtraMarkers.icon({
+                                    icon: styleObj?.icon || 'fa-map-marker',
+                                    markerColor: styleObj?.iconColor || 'red',
+                                    shape: styleObj?.shape || 'circle',
+                                    prefix: 'fa'
+                                });
+                                layer = L.marker(latlng, { icon });
+                            } else {
+                                // Default: CircleMarker with custom style
+                                layer = L.circleMarker(latlng, {
+                                    radius: styleObj?.radius || 8,
+                                    fillColor: styleObj?.fillColor || '#ff6b35',
+                                    color: styleObj?.color || '#fff',
+                                    weight: styleObj?.weight || 2,
+                                    fillOpacity: styleObj?.fillOpacity || 0.7,
+                                });
+                            }
+                        } else {
+                            // LineString or Polygon - use geoJSON
+                            layer = L.geoJSON(geometry, {
+                                style: styleObj ? {
+                                    color: styleObj.color || '#3388ff',
+                                    fillColor: styleObj.fillColor || '#3388ff',
+                                    weight: styleObj.weight || 3,
+                                    opacity: styleObj.opacity || 1,
+                                    fillOpacity: styleObj.fillOpacity || 0.2,
+                                    dashArray: styleObj.dashArray || null,
+                                } : undefined
+                            }).getLayers()[0];
+                        }
 
                         layer.feature = {
                             type: "Feature",
                             properties: { ...item },
                             geometry: geometry,
                         };
-
-                        // Apply style if available
-                        if (item.style) {
-                            try {
-                                const styleObj = JSON.parse(item.style);
-                                // Apply style based on geometry type
-                                if (layer.setStyle) {
-                                    layer.setStyle({
-                                        color: styleObj.color || '#3388ff',
-                                        fillColor: styleObj.fillColor || '#3388ff',
-                                        weight: styleObj.weight || 3,
-                                        opacity: styleObj.opacity || 1,
-                                        fillOpacity: styleObj.fillOpacity || 0.2,
-                                        dashArray: styleObj.dashArray || null,
-                                    });
-                                }
-                            } catch (styleError) {
-                                console.warn('Failed to parse feature style:', styleError);
-                            }
-                        }
 
                         drawnItemsRef.current.addLayer(layer);
 
@@ -502,82 +543,72 @@ const DataEntry = () => {
             return;
         }
 
-        // Ask for confirmation before updating using modal
-        showConfirm(
-            "คุณต้องการบันทึกการแก้ไขข้อมูลนี้หรือไม่?",
-            async () => {
-                // Cancel any pending auto-update
-                if (autoUpdateTimeoutRef.current) {
-                    clearTimeout(autoUpdateTimeoutRef.current);
-                    autoUpdateTimeoutRef.current = null;
+        // Cancel any pending auto-update
+        if (autoUpdateTimeoutRef.current) {
+            clearTimeout(autoUpdateTimeoutRef.current);
+            autoUpdateTimeoutRef.current = null;
+        }
+
+        try {
+            const geojson = currentFeature.toGeoJSON().geometry;
+            const dataArr = columns.map((col) => {
+                let value = formData[col.col_id] || "";
+
+                // Convert date values to ISO format if needed
+                if (col.col_type === "date" && value) {
+                    try {
+                        const dateObj = new Date(value);
+                        if (!isNaN(dateObj.getTime())) {
+                            value = dateObj.toISOString().split('T')[0];
+                        }
+                    } catch (e) {
+                        console.warn(`Failed to parse date for ${col.col_id}:`, e);
+                    }
                 }
 
-                try {
-                    const geojson = currentFeature.toGeoJSON().geometry;
-                    const dataArr = columns.map((col) => {
-                        let value = formData[col.col_id] || "";
+                return {
+                    name: col.col_id,
+                    value: value,
+                };
+            });
 
-                        // Convert date values to ISO format if needed
-                        if (col.col_type === "date" && value) {
-                            try {
-                                const dateObj = new Date(value);
-                                if (!isNaN(dateObj.getTime())) {
-                                    value = dateObj.toISOString().split('T')[0];
-                                }
-                            } catch (e) {
-                                console.warn(`Failed to parse date for ${col.col_id}:`, e);
-                            }
-                        }
+            const response = await fetch("/api/update_layer", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    formid,
+                    id: formData.id,
+                    geojson: JSON.stringify(geojson),
+                    dataarr: JSON.stringify(dataArr),
+                    style: formData.style || null,
+                }),
+            });
 
-                        return {
-                            name: col.col_id,
-                            value: value,
-                        };
-                    });
+            if (response.ok) {
+                // Store the current feature ID to re-select after reload
+                const updatedId = formData.id;
 
-                    const response = await fetch("/api/update_layer", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            formid,
-                            id: formData.id,
-                            geojson: JSON.stringify(geojson),
-                            dataarr: JSON.stringify(dataArr),
-                            style: formData.style || null,
-                        }),
-                    });
+                // Show success message first, then reload and re-select the feature
+                showAlert("อัปเดตข้อมูลสำเร็จ", 'success', 'สำเร็จ', async () => {
+                    // Reload data from database
+                    await loadExistingFeatures();
 
-                    if (response.ok) {
-                        // Store the current feature ID to re-select after reload
-                        const updatedId = formData.id;
-
-                        // Show success message first, then reload and re-select the feature
-                        showAlert("อัปเดตข้อมูลสำเร็จ", 'success', 'สำเร็จ', async () => {
-                            // Reload data from database
-                            await loadExistingFeatures();
-
-                            // Re-select the same feature to show updated values
-                            // Find the layer with the updated ID and trigger its click
-                            if (drawnItemsRef.current) {
-                                drawnItemsRef.current.eachLayer((layer) => {
-                                    if (layer.feature?.properties?.id === updatedId) {
-                                        // Simulate click to reload the feature data into the form
-                                        layer.fire('click');
-                                    }
-                                });
+                    // Re-select the same feature to show updated values
+                    if (drawnItemsRef.current) {
+                        drawnItemsRef.current.eachLayer((layer) => {
+                            if (layer.feature?.properties?.id === updatedId) {
+                                layer.fire('click');
                             }
                         });
-                    } else {
-                        showAlert("เกิดข้อผิดพลาดในการอัปเดต", 'error');
                     }
-                } catch (error) {
-                    console.error("Failed to update feature:", error);
-                    showAlert("เกิดข้อผิดพลาดในการอัปเดต", 'error');
-                }
-            },
-            'info',
-            'ยืนยันการบันทึก'
-        );
+                });
+            } else {
+                showAlert("เกิดข้อผิดพลาดในการอัปเดต", 'error');
+            }
+        } catch (error) {
+            console.error("Failed to update feature:", error);
+            showAlert("เกิดข้อผิดพลาดในการอัปเดต", 'error');
+        }
     };
 
     const deleteFeature = async () => {
@@ -845,14 +876,55 @@ const DataEntry = () => {
                 geometryType={layerInfo?.layertype}
                 style={featureStyle}
                 onChange={setFeatureStyle}
-                onSave={() => {
-                    // Save style to formData so it gets sent with update
-                    setFormData(prev => ({
-                        ...prev,
-                        style: JSON.stringify(featureStyle)
-                    }));
-                    setSymbolEditorOpen(false);
-                    showAlert("บันทึกสัญลักษณ์สำเร็จ กรุณากดอัปเดตข้อมูลเพื่อบันทึกลงฐานข้อมูล", 'success', 'สำเร็จ');
+                onSave={async () => {
+                    // Auto-save style directly to database
+                    if (!formData.id || !formid) {
+                        showAlert("กรุณาเลือกข้อมูลก่อนกำหนดสัญลักษณ์", 'warning');
+                        setSymbolEditorOpen(false);
+                        return;
+                    }
+
+                    try {
+                        const styleJson = JSON.stringify(featureStyle);
+
+                        // Update formData with new style
+                        setFormData(prev => ({
+                            ...prev,
+                            style: styleJson
+                        }));
+
+                        // Save style to database
+                        const response = await fetch("/api/update_style", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                formid,
+                                layerid: formData.id,
+                                layerstyle: styleJson,
+                            }),
+                        });
+
+                        if (response.ok) {
+                            setSymbolEditorOpen(false);
+                            showAlert("บันทึกสัญลักษณ์สำเร็จ", 'success', 'สำเร็จ', async () => {
+                                // Reload features to show updated style
+                                await loadExistingFeatures();
+                                // Re-select the same feature
+                                if (drawnItemsRef.current) {
+                                    drawnItemsRef.current.eachLayer((layer) => {
+                                        if (layer.feature?.properties?.id === formData.id) {
+                                            layer.fire('click');
+                                        }
+                                    });
+                                }
+                            });
+                        } else {
+                            showAlert("เกิดข้อผิดพลาดในการบันทึกสัญลักษณ์", 'error');
+                        }
+                    } catch (error) {
+                        console.error("Failed to save style:", error);
+                        showAlert("เกิดข้อผิดพลาดในการบันทึกสัญลักษณ์", 'error');
+                    }
                 }}
                 onCancel={() => setSymbolEditorOpen(false)}
             />
