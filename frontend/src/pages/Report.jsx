@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/organisms/Navbar';
 import { Card, Text, Button, Select } from '../components/atoms';
 import { Spinner, Alert } from '../components/molecules';
-import { IoDocumentText, IoDownload, IoPrint, IoBarChart, IoHome } from 'react-icons/io5';
+import { IoDocumentText, IoDownload, IoPrint, IoBarChart } from 'react-icons/io5';
+import { BackButton } from '../components/atoms';
 
 const Report = () => {
   const navigate = useNavigate();
@@ -69,15 +70,12 @@ const Report = () => {
       <Navbar />
 
       <div className="container mx-auto px-4 py-8">
+        {/* Back Button */}
+        <BackButton className="mb-6" />
+
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-2">
-            <button
-              onClick={() => navigate("/")}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-            >
-              <IoHome /> หน้าหลัก
-            </button>
             <IoDocumentText className="text-3xl text-orange-600" />
             <Text variant="h2" color="primary">รายงาน</Text>
           </div>

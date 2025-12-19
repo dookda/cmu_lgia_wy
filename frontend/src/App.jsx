@@ -9,6 +9,7 @@ import ManageData from './pages/ManageData';
 import DataEntry from './pages/DataEntry';
 import Users from './pages/Users';
 import Docs from './pages/Docs';
+import Profile from './pages/Profile';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
           <Route path="/data-entry" element={<DataEntry />} />
           <Route path="/users" element={<Users />} />
           <Route path="/docs" element={<Docs />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
       </Router>
     </AuthProvider>

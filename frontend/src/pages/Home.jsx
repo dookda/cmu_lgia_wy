@@ -14,7 +14,13 @@ import {
     IoBook,
     IoSearch,
     IoClose,
+    IoChevronBack,
+    IoChevronForward,
+    IoChevronUp,
+    IoChevronDown,
+    IoEye,
 } from "react-icons/io5";
+import AttributeValue from "../components/atoms/AttributeValue";
 
 const Home = () => {
     const { user } = useAuth();
@@ -30,6 +36,10 @@ const Home = () => {
     const [showModal, setShowModal] = useState(false);
     const [selectedFeature, setSelectedFeature] = useState(null);
     const [featureAttributes, setFeatureAttributes] = useState([]);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [showTable, setShowTable] = useState(true);
+    const [highlightedRowId, setHighlightedRowId] = useState(null);
+    const tableRef = useRef(null);
     const mapRef = useRef(null);
 
     const menuItems = [
@@ -204,20 +214,46 @@ const Home = () => {
 
     const handleFeatureClick = async (formid, id) => {
         try {
+            // Auto-select this layer in the search panel if not already selected
+            if (selectedLayer !== formid) {
+                setSelectedLayer(formid);
+
+                // Load columns for this layer
+                const columnsResponse = await fetch("/api/load_column_description", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ formid }),
+                });
+                const columnsData = await columnsResponse.json();
+                setLayerColumns(columnsData);
+
+                // Load all data for this layer
+                const dataResponse = await fetch("/api/load_layer", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ formid }),
+                });
+                const layerDataResult = await dataResponse.json();
+                setLayerData(layerDataResult || []);
+                setFilteredData(layerDataResult || []);
+
+                // Clear filters
+                setSelectedColumn("");
+                setKeywords([]);
+                setSelectedKeyword("");
+            }
+
+            // Load feature details for modal
             const columnsResponse = await fetch("/api/load_column_description", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ formid }),
             });
             const columnsData = await columnsResponse.json();
 
             const dataResponse = await fetch("/api/load_layer_by_id", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ formid, id }),
             });
             const responseData = await dataResponse.json();
@@ -232,7 +268,18 @@ const Home = () => {
 
                 setSelectedFeature(featureData);
                 setFeatureAttributes(attributes);
-                setShowModal(true);
+
+                // Highlight the row in table (store both formid and id for multi-layer support)
+                setHighlightedRowId({ formid, id });
+                setShowTable(true); // Ensure table is visible
+
+                // Scroll table to highlighted row after data loads
+                setTimeout(() => {
+                    const row = document.getElementById(`table-row-${id}`);
+                    if (row && tableRef.current) {
+                        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 200);
             }
         } catch (error) {
             console.error("Failed to load feature data:", error);
@@ -282,7 +329,21 @@ const Home = () => {
 
             <div className="flex flex-1 overflow-hidden">
                 {/* Sidebar */}
-                <aside className="w-72 bg-white shadow-xl z-20 flex flex-col border-r border-gray-200 overflow-hidden">
+                <aside className={`${sidebarCollapsed ? 'w-16' : 'w-72'} bg-white shadow-xl z-20 flex flex-col border-r border-gray-200 overflow-hidden transition-all duration-300 ease-in-out`}>
+                    {/* Sidebar Header with Collapse Toggle */}
+                    <div className={`p-3 border-b border-gray-200 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+                        {!sidebarCollapsed && (
+                            <h2 className="text-sm font-semibold text-gray-700">เมนู</h2>
+                        )}
+                        <button
+                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                            className="w-8 h-8 bg-gray-100 hover:bg-orange-100 text-gray-600 hover:text-orange-600 rounded-lg flex items-center justify-center transition-colors"
+                            title={sidebarCollapsed ? 'ขยายเมนู' : 'ย่อเมนู'}
+                        >
+                            {sidebarCollapsed ? <IoChevronForward className="text-lg" /> : <IoChevronBack className="text-lg" />}
+                        </button>
+                    </div>
+
                     {/* Menu Links */}
                     <nav className="p-3 border-b border-gray-200">
                         <ul className="space-y-1">
@@ -290,10 +351,11 @@ const Home = () => {
                                 <li key={item.path}>
                                     <Link
                                         to={item.path}
-                                        className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
+                                        className={`flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}
+                                        title={sidebarCollapsed ? item.label : ''}
                                     >
-                                        <item.icon className="text-lg" />
-                                        {item.label}
+                                        <item.icon className="text-lg flex-shrink-0" />
+                                        {!sidebarCollapsed && <span>{item.label}</span>}
                                     </Link>
                                 </li>
                             ))}
@@ -302,10 +364,17 @@ const Home = () => {
 
                     {/* Layer Tree */}
                     <div className="flex-1 overflow-y-auto">
-                        <LayerSidebar
-                            onLayerToggle={handleLayerToggle}
-                            checkedLayers={checkedLayers.map((l) => String(l.formid))}
-                        />
+                        {!sidebarCollapsed && (
+                            <LayerSidebar
+                                onLayerToggle={handleLayerToggle}
+                                checkedLayers={checkedLayers.map((l) => String(l.formid))}
+                            />
+                        )}
+                        {sidebarCollapsed && (
+                            <div className="p-3 flex flex-col items-center">
+                                <IoLayers className="text-2xl text-gray-400" title="ชั้นข้อมูล" />
+                            </div>
+                        )}
                     </div>
                 </aside>
 
@@ -319,6 +388,7 @@ const Home = () => {
                                 onFeatureClick={handleFeatureClick}
                                 enableWeatherLayers={true}
                                 mapRef={mapRef}
+                                highlightedFeatureId={highlightedRowId}
                             />
 
                             {/* Floating Filter Panel */}
@@ -403,21 +473,63 @@ const Home = () => {
                         </div>
                     </div>
 
-                    {/* Data Table */}
-                    <div className="h-64 bg-white border-t border-gray-200 overflow-auto">
-                        {filteredData.length > 0 ? (
-                            <div className="p-4">
+                    {/* Data Table with Toggle */}
+                    <div className="bg-white border-t border-gray-200">
+                        {/* Table Header with Toggle */}
+                        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+                            <div className="flex items-center gap-3">
+                                <h4 className="text-sm font-semibold text-gray-700">
+                                    ตารางข้อมูล
+                                </h4>
+                                {filteredData.length > 0 && (
+                                    <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                                        {filteredData.length} รายการ
+                                    </span>
+                                )}
+                                {highlightedRowId && (
+                                    <button
+                                        onClick={() => setHighlightedRowId(null)}
+                                        className="text-xs text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-full transition-colors"
+                                    >
+                                        ✕ ล้างการเลือก
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setShowTable(!showTable)}
+                                className="flex items-center gap-1 text-sm text-gray-600 hover:text-orange-600 transition-colors"
+                            >
+                                {showTable ? (
+                                    <>
+                                        <IoChevronDown className="text-lg" />
+                                        <span>ซ่อน</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <IoChevronUp className="text-lg" />
+                                        <span>แสดง</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Table Content - Collapsible */}
+                        <div
+                            ref={tableRef}
+                            className={`overflow-auto transition-all duration-300 ease-in-out ${showTable ? 'max-h-72' : 'max-h-0'}`}
+                        >
+                            {filteredData.length > 0 ? (
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
+                                        <thead className="bg-gray-50 sticky top-0">
                                             <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    ซูม
+                                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    ดู
                                                 </th>
                                                 {layerColumns.map((col) => (
                                                     <th
                                                         key={col.col_id}
-                                                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                                                     >
                                                         {col.col_name}
                                                     </th>
@@ -426,19 +538,39 @@ const Home = () => {
                                         </thead>
                                         <tbody className="bg-white divide-y divide-gray-200">
                                             {filteredData.map((row) => (
-                                                <tr key={row.id} className="hover:bg-gray-50">
-                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                <tr
+                                                    key={row.id}
+                                                    id={`table-row-${row.id}`}
+                                                    onClick={() => {
+                                                        setHighlightedRowId({ formid: selectedLayer, id: row.id });
+                                                        handleZoomToFeature(row.id);
+                                                    }}
+                                                    className={`cursor-pointer transition-colors ${highlightedRowId?.id === row.id && highlightedRowId?.formid === selectedLayer
+                                                        ? 'bg-orange-100 hover:bg-orange-150'
+                                                        : 'hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    <td className="px-3 py-2 whitespace-nowrap">
                                                         <button
-                                                            onClick={() => handleZoomToFeature(row.id)}
-                                                            className="text-orange-600 hover:text-orange-700"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setHighlightedRowId({ formid: selectedLayer, id: row.id });
+                                                                // Load and show modal with details
+                                                                if (selectedLayer) {
+                                                                    handleFeatureClick(selectedLayer, row.id);
+                                                                    setShowModal(true);
+                                                                }
+                                                            }}
+                                                            className="text-blue-600 hover:text-blue-700 p-1 rounded hover:bg-blue-50"
+                                                            title="ดูรายละเอียด"
                                                         >
-                                                            <IoSearch className="text-lg" />
+                                                            <IoEye className="text-lg" />
                                                         </button>
                                                     </td>
                                                     {layerColumns.map((col) => (
                                                         <td
                                                             key={col.col_id}
-                                                            className="px-4 py-3 whitespace-nowrap text-sm text-gray-900"
+                                                            className="px-3 py-2 whitespace-nowrap text-sm text-gray-900"
                                                         >
                                                             {row[col.col_id] || "-"}
                                                         </td>
@@ -448,12 +580,12 @@ const Home = () => {
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-400">
-                                <p>เลือกชั้นข้อมูลเพื่อแสดงตาราง</p>
-                            </div>
-                        )}
+                            ) : (
+                                <div className="h-32 flex items-center justify-center text-gray-400">
+                                    <p>เลือกชั้นข้อมูลและค้นหาเพื่อแสดงตาราง</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </main>
             </div>
@@ -486,11 +618,12 @@ const Home = () => {
                                         <p className="text-sm font-medium text-gray-600">
                                             {attr.name}
                                         </p>
-                                        <p className="text-base text-gray-900 mt-1">
-                                            {attr.type === "date" && attr.value !== "-"
-                                                ? new Date(attr.value).toLocaleDateString("th-TH")
-                                                : attr.value}
-                                        </p>
+                                        <div className="text-base text-gray-900 mt-1">
+                                            <AttributeValue
+                                                value={attr.value}
+                                                type={attr.type}
+                                            />
+                                        </div>
                                     </div>
                                 ))}
                             </div>

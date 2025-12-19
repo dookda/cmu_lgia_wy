@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
+import { getLayerStyle, getCircleMarkerStyle } from "../../utils/mapStyles";
 
 // Load ExtraMarkers for styled icon markers
 const loadExtraMarkers = () => {
@@ -39,12 +40,13 @@ L.Icon.Default.mergeOptions({
     shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-const LeafletMap = ({ checkedLayers = [], onFeatureClick, enableWeatherLayers = true, mapRef: externalMapRef }) => {
+const LeafletMap = ({ checkedLayers = [], onFeatureClick, enableWeatherLayers = true, mapRef: externalMapRef, highlightedFeatureId = null }) => {
     const mapContainerRef = useRef(null);
     const mapInstance = useRef(null);
     const userLayersRef = useRef(new Map()); // Use Map for better key management
     const weatherLayersRef = useRef({});
     const layerControlRef = useRef(null); // Track layer control to prevent duplicates
+    const highlightLayerRef = useRef(null); // Highlight layer for selected feature
     const [isMapReady, setIsMapReady] = useState(false);
 
     // Create a shared canvas renderer
@@ -285,33 +287,17 @@ const LeafletMap = ({ checkedLayers = [], onFeatureClick, enableWeatherLayers = 
                         return L.marker(latlng, { icon });
                     } else {
                         // Default: CircleMarker with canvas renderer for performance
+                        const circleStyle = getCircleMarkerStyle(s);
                         return L.circleMarker(latlng, {
-                            radius: s?.radius || 8,
-                            fillColor: s?.fillColor || "#ff6b35",
-                            color: s?.color || "#fff",
-                            weight: s?.weight || 2,
-                            fillOpacity: s?.fillOpacity || 0.7,
+                            ...circleStyle,
                             renderer: canvasRendererRef.current
                         });
                     }
                 },
                 style: (feature) => {
                     const s = feature.properties.style;
-                    const lt = String(layertype).toLowerCase();
-                    if (lt === "linestring") {
-                        return {
-                            color: s?.color || "#3388ff",
-                            weight: s?.weight || 3
-                        };
-                    } else if (lt === "polygon") {
-                        return {
-                            color: s?.color || "#3388ff",
-                            fillColor: s?.fillColor || "#3388ff",
-                            weight: s?.weight || 2,
-                            fillOpacity: s?.fillOpacity || 0.5
-                        };
-                    }
-                    return {};
+                    // Use shared style utility to ensure consistency with DataEntry
+                    return getLayerStyle(layertype, s);
                 },
                 onEachFeature: (feature, layer) => {
                     // Use single click handler instead of multiple event listeners
@@ -387,6 +373,77 @@ const LeafletMap = ({ checkedLayers = [], onFeatureClick, enableWeatherLayers = 
 
         return () => clearTimeout(timeoutId);
     }, [checkedLayers, isMapReady, loadLayer, removeLayer]);
+
+    // Handle highlighted feature - show glowing effect
+    useEffect(() => {
+        if (!isMapReady || !mapInstance.current) return;
+
+        // Remove existing highlight layer
+        if (highlightLayerRef.current) {
+            mapInstance.current.removeLayer(highlightLayerRef.current);
+            highlightLayerRef.current = null;
+        }
+
+        if (!highlightedFeatureId) return;
+
+        // Extract formid and id from the highlight object (supports both object and simple id formats)
+        const targetFormid = highlightedFeatureId?.formid || null;
+        const targetId = highlightedFeatureId?.id || highlightedFeatureId;
+
+        // Find the feature in loaded layers
+        let foundFeature = null;
+
+        userLayersRef.current.forEach((geoJsonLayer, formid) => {
+            // If targetFormid is specified, only search in that layer
+            if (targetFormid && String(formid) !== String(targetFormid)) return;
+
+            geoJsonLayer.eachLayer((layer) => {
+                if (layer.feature?.properties?.id === targetId) {
+                    foundFeature = layer.feature;
+                }
+            });
+        });
+
+        if (foundFeature) {
+            // Create highlight layer with glowing style
+            const highlightStyle = {
+                color: '#ff6600',
+                weight: 4,
+                opacity: 1,
+                fillColor: '#ff6600',
+                fillOpacity: 0.3,
+                className: 'highlight-pulse'
+            };
+
+            if (foundFeature.geometry.type === 'Point') {
+                const coords = foundFeature.geometry.coordinates;
+                highlightLayerRef.current = L.circleMarker([coords[1], coords[0]], {
+                    radius: 18,
+                    ...highlightStyle,
+                    weight: 3,
+                    fillOpacity: 0.4
+                });
+            } else {
+                highlightLayerRef.current = L.geoJSON(foundFeature, {
+                    style: highlightStyle
+                });
+            }
+
+            highlightLayerRef.current.addTo(mapInstance.current);
+
+            // Bring to front
+            if (highlightLayerRef.current.bringToFront) {
+                highlightLayerRef.current.bringToFront();
+            }
+        }
+
+        return () => {
+            if (highlightLayerRef.current && mapInstance.current) {
+                mapInstance.current.removeLayer(highlightLayerRef.current);
+                highlightLayerRef.current = null;
+            }
+        };
+    }, [highlightedFeatureId, isMapReady]);
 
     return <div ref={mapContainerRef} className="w-full h-full" />;
 };

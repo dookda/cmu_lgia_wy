@@ -6,7 +6,10 @@ import "@geoman-io/leaflet-geoman-free";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
 import Navbar from "../components/organisms/Navbar";
 import { AlertModal, ConfirmModal, SymbolEditorModal } from "../components/molecules";
-import { IoSave, IoTrash, IoHome, IoSearch, IoColorPalette } from "react-icons/io5";
+import { IoSave, IoTrash, IoSearch, IoColorPalette } from "react-icons/io5";
+import { BackButton } from "../components/atoms";
+import { getFeatureStyle, getCircleMarkerStyle } from "../utils/mapStyles";
+import AttributeValue, { isBase64Image } from "../components/atoms/AttributeValue";
 
 // Load ExtraMarkers for styled icon markers
 const loadExtraMarkers = () => {
@@ -299,6 +302,47 @@ const DataEntry = () => {
                 setCurrentFeature(null);
                 setFormData({});
             });
+
+            // Clear form when clicking on empty map area (not on a feature)
+            mapInstance.current.on("click", (e) => {
+                // Check if the click hit any feature in drawnItems
+                let hitFeature = false;
+
+                if (drawnItemsRef.current) {
+                    drawnItemsRef.current.eachLayer((layer) => {
+                        // For markers and circle markers, check if the click is close enough
+                        if (layer.getLatLng) {
+                            const layerLatLng = layer.getLatLng();
+                            const distance = mapInstance.current.distance(e.latlng, layerLatLng);
+                            // Consider it a hit if within 20 meters (for point features)
+                            if (distance < 20) {
+                                hitFeature = true;
+                            }
+                        }
+                        // For polygons and polylines, check if point is inside bounds
+                        if (layer.getBounds && layer.getBounds().contains(e.latlng)) {
+                            hitFeature = true;
+                        }
+                    });
+                }
+
+                // If no feature was hit, clear the form
+                if (!hitFeature) {
+                    // Disable editing on current layer if any
+                    if (currentEditingLayerRef.current) {
+                        try {
+                            currentEditingLayerRef.current.pm.disable();
+                        } catch (err) {
+                            // Layer might not have pm enabled
+                        }
+                        currentEditingLayerRef.current = null;
+                    }
+                    setCurrentFeature(null);
+                    setEditMode(false);
+                    setFormData({});
+                    console.log("Clicked on empty map area - form cleared");
+                }
+            });
         }
     };
 
@@ -388,26 +432,13 @@ const DataEntry = () => {
                                 });
                                 layer = L.marker(latlng, { icon });
                             } else {
-                                // Default: CircleMarker with custom style
-                                layer = L.circleMarker(latlng, {
-                                    radius: styleObj?.radius || 8,
-                                    fillColor: styleObj?.fillColor || '#ff6b35',
-                                    color: styleObj?.color || '#fff',
-                                    weight: styleObj?.weight || 2,
-                                    fillOpacity: styleObj?.fillOpacity || 0.7,
-                                });
+                                // Default: CircleMarker with custom style using shared utility
+                                layer = L.circleMarker(latlng, getCircleMarkerStyle(styleObj));
                             }
                         } else {
-                            // LineString or Polygon - use geoJSON
+                            // LineString or Polygon - use geoJSON with shared styling
                             layer = L.geoJSON(geometry, {
-                                style: styleObj ? {
-                                    color: styleObj.color || '#3388ff',
-                                    fillColor: styleObj.fillColor || '#3388ff',
-                                    weight: styleObj.weight || 3,
-                                    opacity: styleObj.opacity || 1,
-                                    fillOpacity: styleObj.fillOpacity || 0.2,
-                                    dashArray: styleObj.dashArray || null,
-                                } : undefined
+                                style: () => getFeatureStyle(geometry.type, styleObj)
                             }).getLayers()[0];
                         }
 
@@ -657,13 +688,10 @@ const DataEntry = () => {
                 {/* Main Content */}
                 <div className="flex-1 p-4 overflow-auto">
                     <div className="mb-4">
+                        {/* Back Button */}
+                        <BackButton label="จัดการข้อมูล" to="/manage-data" className="mb-4" />
+
                         <div className="flex items-center gap-4 mb-2">
-                            <button
-                                onClick={() => navigate("/manage-data")}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-                            >
-                                <IoHome /> จัดการข้อมูล
-                            </button>
                             <h2 className="text-2xl font-bold text-gray-800">
                                 {layerInfo ? `เพิ่ม/แก้ไขข้อมูล: ${layerInfo.layername}` : "เพิ่ม/แก้ไขข้อมูล"}
                             </h2>
@@ -765,35 +793,54 @@ const DataEntry = () => {
                             <div className="bg-white rounded-lg shadow p-4">
                                 <h3 className="text-lg font-semibold mb-3">ข้อมูลรายละเอียด</h3>
                                 <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                                    {columns.map((col) => (
-                                        <div key={col.col_id}>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                {col.col_name}
-                                            </label>
-                                            {col.col_type === "date" ? (
-                                                <input
-                                                    type="date"
-                                                    value={formData[col.col_id] || ""}
-                                                    onChange={(e) => handleInputChange(col.col_id, e.target.value)}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                                />
-                                            ) : col.col_type === "numeric" ? (
-                                                <input
-                                                    type="number"
-                                                    value={formData[col.col_id] || ""}
-                                                    onChange={(e) => handleInputChange(col.col_id, e.target.value)}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                                />
-                                            ) : (
-                                                <input
-                                                    type="text"
-                                                    value={formData[col.col_id] || ""}
-                                                    onChange={(e) => handleInputChange(col.col_id, e.target.value)}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                                                />
-                                            )}
-                                        </div>
-                                    ))}
+                                    {columns.map((col) => {
+                                        const fieldValue = formData[col.col_id] || "";
+                                        const isImage = isBase64Image(fieldValue);
+
+                                        return (
+                                            <div key={col.col_id}>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                    {col.col_name}
+                                                </label>
+                                                {/* Show image preview if value is base64 image */}
+                                                {isImage && (
+                                                    <div className="mb-2">
+                                                        <AttributeValue value={fieldValue} type={col.col_type} />
+                                                    </div>
+                                                )}
+                                                {/* Show input field (read-only for images, editable for other types) */}
+                                                {col.col_type === "date" ? (
+                                                    <input
+                                                        type="date"
+                                                        value={fieldValue}
+                                                        onChange={(e) => handleInputChange(col.col_id, e.target.value)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                                    />
+                                                ) : col.col_type === "numeric" ? (
+                                                    <input
+                                                        type="number"
+                                                        value={fieldValue}
+                                                        onChange={(e) => handleInputChange(col.col_id, e.target.value)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                                    />
+                                                ) : isImage ? (
+                                                    <input
+                                                        type="text"
+                                                        value="[รูปภาพ Base64]"
+                                                        disabled
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+                                                    />
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={fieldValue}
+                                                        onChange={(e) => handleInputChange(col.col_id, e.target.value)}
+                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                                    />
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Action Buttons */}

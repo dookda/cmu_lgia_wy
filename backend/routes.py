@@ -625,6 +625,91 @@ async def delete_user(req: DeleteUserRequest):
     return {"status": "deleted"}
 
 
+# ============ Profile Endpoints ============
+
+class UpdateProfileRequest(BaseModel):
+    username: str
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/get_profile")
+async def get_profile(user: dict = Depends(verify_token)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Ensure full_name column exists
+        try:
+            await conn.execute("ALTER TABLE tb_user ADD COLUMN IF NOT EXISTS full_name TEXT")
+        except Exception:
+            pass  # Column may already exist or other issue, continue anyway
+        
+        row = await conn.fetchrow(
+            """SELECT id, username, email, division, auth, 
+                      COALESCE(full_name, '') as full_name,
+                      TO_CHAR(ts, 'DD-MM-YYYY') as created_at 
+               FROM tb_user WHERE username = $1""",
+            user["username"]
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found")
+        return dict(row)
+
+
+@router.post("/update_profile")
+async def update_profile(req: UpdateProfileRequest, user: dict = Depends(verify_token)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Check if full_name column exists, if not add it
+        try:
+            await conn.execute(
+                """UPDATE tb_user SET email = $1, full_name = $2 
+                   WHERE username = $3""",
+                req.email or '', req.full_name or '', user["username"]
+            )
+        except Exception as e:
+            # If full_name column doesn't exist, try to add it first
+            if 'full_name' in str(e):
+                await conn.execute("ALTER TABLE tb_user ADD COLUMN IF NOT EXISTS full_name TEXT")
+                await conn.execute(
+                    """UPDATE tb_user SET email = $1, full_name = $2 
+                       WHERE username = $3""",
+                    req.email or '', req.full_name or '', user["username"]
+                )
+            else:
+                raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "updated"}
+
+
+@router.post("/change_password")
+async def change_password(req: ChangePasswordRequest, user: dict = Depends(verify_token)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Get current password hash
+        row = await conn.fetchrow(
+            "SELECT pass FROM tb_user WHERE username = $1",
+            user["username"]
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Verify current password
+        if not verify_password(req.current_password, row["pass"]):
+            raise HTTPException(status_code=400, detail="รหัสผ่านปัจจุบันไม่ถูกต้อง")
+        
+        # Hash and update new password
+        new_hash = get_password_hash(req.new_password)
+        await conn.execute(
+            "UPDATE tb_user SET pass = $1 WHERE username = $2",
+            new_hash, user["username"]
+        )
+    return {"status": "password_changed"}
+
+
 # ============ File Upload ============
 
 @router.post("/upload")

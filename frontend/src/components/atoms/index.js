@@ -5,3 +5,5 @@ export { default as Checkbox } from './Checkbox';
 export { default as Text } from './Text';
 export { default as Select } from './Select';
 export { default as Icon } from './Icon';
+export { default as AttributeValue } from './AttributeValue';
+export { default as BackButton } from './BackButton';
