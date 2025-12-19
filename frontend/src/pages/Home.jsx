@@ -567,14 +567,41 @@ const Home = () => {
                                                             <IoEye className="text-lg" />
                                                         </button>
                                                     </td>
-                                                    {layerColumns.map((col) => (
-                                                        <td
-                                                            key={col.col_id}
-                                                            className="px-3 py-2 whitespace-nowrap text-sm text-gray-900"
-                                                        >
-                                                            {row[col.col_id] || "-"}
-                                                        </td>
-                                                    ))}
+                                                    {layerColumns.map((col) => {
+                                                        const cellValue = row[col.col_id];
+                                                        const isImage = cellValue && typeof cellValue === 'string' && (
+                                                            cellValue.startsWith('data:image/') ||
+                                                            cellValue.startsWith('/9j/') ||
+                                                            cellValue.startsWith('iVBOR') ||
+                                                            cellValue.startsWith('R0lGO')
+                                                        );
+
+                                                        // Get proper image src
+                                                        const getImageSrc = (value) => {
+                                                            if (value.startsWith('data:image/')) return value;
+                                                            if (value.startsWith('/9j/')) return `data:image/jpeg;base64,${value}`;
+                                                            if (value.startsWith('iVBOR')) return `data:image/png;base64,${value}`;
+                                                            if (value.startsWith('R0lGO')) return `data:image/gif;base64,${value}`;
+                                                            return `data:image/jpeg;base64,${value}`;
+                                                        };
+
+                                                        return (
+                                                            <td
+                                                                key={col.col_id}
+                                                                className="px-3 py-2 whitespace-nowrap text-sm text-gray-900"
+                                                            >
+                                                                {isImage ? (
+                                                                    <img
+                                                                        src={getImageSrc(cellValue)}
+                                                                        alt="thumbnail"
+                                                                        className="w-10 h-10 object-cover rounded border border-gray-200"
+                                                                    />
+                                                                ) : (
+                                                                    cellValue || "-"
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    })}
                                                 </tr>
                                             ))}
                                         </tbody>
