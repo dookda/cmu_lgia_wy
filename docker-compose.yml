@@ -8,14 +8,10 @@ services:
     depends_on:
       postgis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-    ports:
-      - "8000:8000"
     environment:
       - PG_HOST=postgis
       - PG_USER=postgres
-      - PG_PASSWORD=1234
+      - PG_PASSWORD=${PG_PASSWORD:-1234}
       - PG_NAME=lgia
       - PG_PORT=5432
     healthcheck:
@@ -24,6 +20,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - lgia_network
 
   postgis:
     image: imresamu/postgis:17-3.5-alpine
@@ -31,7 +29,7 @@ services:
     restart: always
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=1234
+      - POSTGRES_PASSWORD=${PG_PASSWORD:-1234}
     ports:
       - 5433:5432
     volumes:
@@ -43,8 +41,12 @@ services:
       timeout: 5s
       retries: 30
       start_period: 60s
+    networks:
+      - lgia_network
 
-  frontend:
+  # Development frontend (Vite dev server)
+  frontend-dev:
+    profiles: [ "dev" ]
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -59,6 +61,29 @@ services:
     ports:
       - "5173:5173"
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    networks:
+      - lgia_network
+
+  # Production frontend (nginx + built assets)
+  frontend-prod:
+    profiles: [ "prod" ]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: lgia_frontend
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    networks:
+      - lgia_network
 
 volumes:
   pgdata:
+
+
+networks:
+  lgia_network:
+    driver: bridge
