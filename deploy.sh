@@ -23,11 +23,11 @@ fi
 
 # Stop existing containers
 echo "🛑 Stopping existing containers..."
-docker compose --profile prod down
+docker-compose down
 
 # Build and start containers
 echo "🔨 Building and starting containers..."
-docker compose --profile prod up -d --build
+docker-compose up -d --build
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."
@@ -35,7 +35,7 @@ sleep 10
 
 # Check if services are running
 echo "✅ Checking service status..."
-docker compose --profile prod ps
+docker-compose ps
 
 echo ""
 echo "🎉 Deployment complete!"
@@ -43,6 +43,6 @@ echo "📍 Application is running on port 3000"
 echo "🌐 Access via: http://wiangyonghub-lgia.com"
 echo ""
 echo "📋 Useful commands:"
-echo "   View logs:     docker compose --profile prod logs -f"
-echo "   Stop:          docker compose --profile prod down"
-echo "   Restart:       docker compose --profile prod restart"
+echo "   View logs:     docker-compose logs -f"
+echo "   Stop:          docker-compose down"
+echo "   Restart:       docker-compose restart"

@@ -10,6 +10,10 @@ services:
     depends_on:
       postgis:
         condition: service_healthy
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
     environment:
       - PG_HOST=postgis
       - PG_USER=postgres
@@ -49,14 +53,18 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile
     container_name: lgia_frontend
-    restart: always
+    working_dir: /app
     depends_on:
       backend:
         condition: service_healthy
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     ports:
-      - "3000:80"
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     networks:
       - lgia_network
 
